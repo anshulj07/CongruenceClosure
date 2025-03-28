@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Congruence Closure Web Tool</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f0f2f5;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+    }
+
+    .left-panel {
+      flex: 1;
+      padding: 30px;
+      background-color: #ffffff;
+      box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .left-panel h1 {
+      color: #2c3e50;
+      margin-bottom: 20px;
+    }
+
+    .left-panel input[type="text"] {
+      padding: 12px;
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    .left-panel input[type="file"] {
+      margin: 10px 0;
+    }
+
+    .left-panel button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      background-color: #3498db;
+      color: white;
+      border-radius: 5px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .left-panel button:hover {
+      background-color: #2980b9;
+    }
+
+    .right-panel {
+      flex: 2;
+      padding: 30px;
+      background-color: #ecf0f1;
+      overflow-y: auto;
+    }
+
+    .right-panel h3 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+    }
+
+    .right-panel pre {
+      background-color: #ffffff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .instructions {
+      margin-top: 30px;
+      text-align: left;
+      font-size: 14px;
+      color: #555;
+    }
+  </style>
+  <script>
+    window.onload = () => {
+      document.querySelector('input[name="expression"]').focus();
+    };
+  </script>  
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      document.querySelector(`[onclick*="${tabId}"]`).classList.add('active');
+    }
+  </script>  
+</head>
+<body>
+  <div class="container">
+    <div class="left-panel">
+      <h1>🧠 Congruence Closure</h1>
+      <form method="post">
+        <input type="text" name="expression" placeholder="(= a b) or a b for explain">
+        <div>
+          <button name="action" value="assert">Add Assertion</button>
+          <button name="action" value="explain">Explain</button>
+          <button name="action" value="show">Show Closure</button>
+          <button name="action" value="visualize">Visualize</button>
+        </div>
+      </form>
+      <form method="POST" action="/upload" enctype="multipart/form-data">
+        <input type="file" name="smtfile">
+        <button type="submit">Upload .smt2 File</button>
+      </form>
+
+      <div class="instructions">
+        <p><strong>Instructions:</strong></p>
+        <ul>
+          <li><strong>Add Assertion</strong>: Add an equation like <code>(= a b)</code> or <code>(= (f a) c)</code></li>
+          <li><strong>Explain</strong>: Enter two terms like <code>a b</code> or <code>(f a) c</code> to see why they are equal or not</li>
+          <li><strong>Show Closure</strong>: Show current equivalence classes</li>
+          <li><strong>Visualize</strong>: Render the proof forest</li>
+          <li><strong>Upload</strong>: Load multiple assertions from a .smt2 file</li>
+        </ul>
+      </div>
+    </div>
+    <div class="right-panel">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('assertions')">📜 Assertions</button>
+        <button class="tab-btn" onclick="switchTab('explanations')">💡 Explanations</button>
+      </div>
+    
+      <div id="assertions" class="tab-content active">
+        <pre>{{ assertion_log }}</pre>
+      </div>
+      
+      <div id="explanations" class="tab-content">
+        <pre>{{ output }}</pre>
+      </div>
+    </div>    
+  </div>
+</body>
+</html>
