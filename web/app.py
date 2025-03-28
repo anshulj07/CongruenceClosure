@@ -19,11 +19,9 @@ def index():
     if request.method == "POST":
         action = request.form.get("action")
         expression = request.form.get("expression", "")
-        if not expression.strip():
+        if action in ["assert", "explain"] and not expression.strip():
             output += "❌ Error: Input is empty. Please enter two terms or an equation.\n"
-            return render_template("index.html", output=output, assertion_log="\n".join(
-                cc.term_to_str(eq) for eq in cc.history
-            ))
+            return render_template("index.html", output=output)
 
         if action == "assert":
             try:
@@ -117,7 +115,12 @@ def index():
 
         elif action == "visualize":
             try:
-                visualize_proof_forest(cc, show=True)
+                img_base64 = visualize_proof_forest(cc)
+                if img_base64:
+                    image_html = f'<img src="data:image/png;base64,{img_base64}" style="max-width:100%;">'
+                    output += "📊 Visualized Proof Forest:\n" + image_html
+                else:
+                    output += "⚠️ No proof forest to visualize.\n"
             except Exception as e:
                 output += f"❌ Visualization error: {e}\n"
 
