@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 from core.closure import CongruenceClosure
-from visualizer.graph_utils import visualize_proof_forest
 
 class ClosureGUI:
     def __init__(self, root):
@@ -70,12 +69,6 @@ class ClosureGUI:
                 self.output.insert(tk.END, f"📄 Loaded file: {filepath}\n")
             except Exception as e:
                 self.output.insert(tk.END, f"❌ Failed to load: {e}\n")
-
-    def visualize(self):
-        try:
-            visualize_proof_forest(self.cc)
-        except Exception as e:
-            messagebox.showerror("Visualization Error", str(e))
 
     def clear_output(self):
         self.output.delete(1.0, tk.END)

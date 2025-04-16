@@ -1,60 +1,62 @@
 from io import StringIO
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, jsonify, render_template, request, redirect, url_for
 from core.closure import CongruenceClosure
-from visualizer.graph_utils import visualize_proof_forest
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 print("System Path", sys.path)
 
-app = Flask(__name__)
+app = Flask(__name__,
+        template_folder="web/templates",
+        static_folder="web/static")
+
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+
 cc = CongruenceClosure()
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+history_blocks = []
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     output = ""
+
     if request.method == "POST":
         action = request.form.get("action")
         expression = request.form.get("expression", "")
+
+        if not action:
+            return render_template("index.html", history_blocks=history_blocks, output="", assertion_log="")
+
         if action in ["assert", "explain"] and not expression.strip():
             output += "❌ Error: Input is empty. Please enter two terms or an equation.\n"
-            return render_template("index.html", output=output)
+            return render_template("index.html", history_blocks=history_blocks, output=output)
 
         if action == "assert":
             try:
                 parsed = cc.process_input(expression)
                 cc.add_equation(parsed)
-                output += f"✔ Assertion added: {expression}\n"
+                output += cc.debug_log
             except Exception as e:
                 output += f"❌ Error: {e}\n"
 
         elif action == "explain":
             try:
-                output += f"🪵 Raw Input: {expression}\n"
-
-                tokens = cc.tokenize(expression)
-                output += f"🧩 Tokens: {tokens}\n"
-
-                if len(tokens) == 2:
-                    # Raw two-term input (e.g. "a c" or "f(a) c")
+                if expression.count(" ") == 1:
+                    # Raw input like "a c"
+                    tokens = cc.tokenize(expression)
+                    t1_raw, t2_raw = tokens
 
                     def normalize_term(raw):
-                        try:
-                            term_tokens = cc.tokenize(raw)
-                            parsed = cc.parse(term_tokens)
-                            curried = cc.curry(parsed)
-                            flat = cc.flatten(curried)
-                            return cc.term_to_str(flat)
-                        except Exception:
-                            return raw  # fallback to original if parsing fails
+                        term_expr = cc.process_input(raw)
+                        return cc.term_to_str(term_expr)
 
-                    t1_raw, t2_raw = tokens
                     t1 = normalize_term(t1_raw)
                     t2 = normalize_term(t2_raw)
 
+                    output += cc.debug_log
                     output += f"📘 Explanation for: {t1} == {t2}\n"
 
                     if not cc.are_equivalent(t1, t2):
@@ -71,23 +73,19 @@ def index():
                         output += temp_out.getvalue()
 
                 else:
-                    # Structured input (e.g. "(= (f a) c)")
-                    parsed = cc.parse(tokens)
-                    output += f"🧠 Parsed: {parsed}\n"
-
-                    curried = cc.curry(parsed)
-                    flat = cc.flatten(curried)
-                    output += f"🪜 Curried & Flattened: {flat}\n"
+                    # Full SMT-like structured expression
+                    parsed_expr = cc.process_input(expression)
+                    output += cc.debug_log
 
                     if (
-                        not isinstance(flat, dict) or
-                        flat.get("type") != "function" or
-                        len(flat.get("arguments", [])) != 2
+                        not isinstance(parsed_expr, dict) or
+                        parsed_expr.get("type") != "function" or
+                        len(parsed_expr.get("arguments", [])) != 2
                     ):
                         output += "❌ Please enter exactly two terms like: (= (f a) b)\n"
                     else:
-                        t1 = cc.term_to_str(flat['arguments'][0])
-                        t2 = cc.term_to_str(flat['arguments'][1])
+                        t1 = cc.term_to_str(parsed_expr['arguments'][0])
+                        t2 = cc.term_to_str(parsed_expr['arguments'][1])
                         output += f"📘 Explanation for: {t1} == {t2}\n"
                         if not cc.are_equivalent(t1, t2):
                             output += f"❌ {t1} and {t2} are not equivalent.\n"
@@ -113,18 +111,14 @@ def index():
             sys.stdout = sys.__stdout__
             output += f"📦 Final Congruence Closure:\n{temp_out.getvalue()}"
 
-        elif action == "visualize":
-            try:
-                img_base64 = visualize_proof_forest(cc)
-                if img_base64:
-                    image_html = f'<img src="data:image/png;base64,{img_base64}" style="max-width:100%;">'
-                    output += "📊 Visualized Proof Forest:\n" + image_html
-                else:
-                    output += "⚠️ No proof forest to visualize.\n"
-            except Exception as e:
-                output += f"❌ Visualization error: {e}\n"
+        if output.strip():  # Only append if something was generated
+            history_blocks.append({
+                "expression": expression,
+                "action": action,
+                "output": output
+            })
 
-    return render_template("index.html", output=output, assertion_log="\n".join(
+    return render_template("index.html", history_blocks=history_blocks, output=output, assertion_log="\n".join(
         cc.term_to_str(eq) for eq in cc.history
     ))
 
@@ -143,5 +137,17 @@ def upload():
         msg = "❌ No file selected."
     return redirect(url_for("index", msg=msg))
 
+
+@app.route("/tree", methods=["POST"])
+def get_expression_tree():
+    expression = request.form.get("expression", "")
+    try:
+        tree = cc.process_input(expression)
+        return jsonify(tree)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
 if __name__ == "__main__":
     app.run(debug=True)
+
+

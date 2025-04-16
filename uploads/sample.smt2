@@ -1,7 +1,0 @@
-(assert (= a b))
-(assert (= b c))
-(assert (= c d))
-(assert (not (= a z)))
-(assert (= f(a) f(b)))
-(assert (= s(p(x)) x))
-(assert (= p(s(y)) y))

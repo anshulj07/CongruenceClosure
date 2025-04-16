@@ -1,6 +1,7 @@
 import re
 from collections import deque, defaultdict
 
+
 class CongruenceClosure:
     def __init__(self):
         self.equations = deque()
@@ -12,6 +13,7 @@ class CongruenceClosure:
         self.lookup = {}
         self.interpreted = {'s': 'p', 'p': 's'}
         self.disequalities = set()
+        self.debug_log = ""
 
     # --- Input Parsing ---
     def parse_smtlib_line(self, line):
@@ -50,12 +52,12 @@ class CongruenceClosure:
 
     # --- Tokenization & Parsing ---
     def tokenize(self, expression):
-        print(f"🧩 Tokenizing: {expression}")
+        self.debug_log += f"🧩 Tokenizing: {expression}\n"
         expression = expression.replace("(", " ( ").replace(")", " ) ").replace(",", " ")
         # 👇 Fix: treat = as a separate token too
         expression = expression.replace("=", " = ")
         tokens = re.findall(r'\w+|[=()]', expression)
-        print(f"🪙 Tokens: {tokens}")
+        self.debug_log += f"🪙 Tokens: {tokens}\n"
         return tokens
 
     def parse(self, tokens):
@@ -103,19 +105,20 @@ class CongruenceClosure:
         return expression
 
     def process_input(self, input_str):
-        print(f"🪵 Raw Input: {input_str}")
+        self.debug_log = ""  # Reset log for current input
+        self.debug_log += f"🪵 Raw Input: {input_str}\n"
         # 🛠 Fix input like "=(a,b)" to standard format
         if input_str.startswith("=(") and input_str.endswith(")"):
             input_str = "(= " + input_str[2:-1].replace(",", " ") + ")"
-            print(f"🔧 Normalized to: {input_str}")
+            self.debug_log += f"🔧 Normalized to: {input_str}\n"
 
         tokens = self.tokenize(input_str)
         parsed_expression = self.parse(tokens)
-        print(f"🧠 Parsed: {parsed_expression}")
+        self.debug_log += f"🧠 Parsed: {parsed_expression}\n"
         curried_expression = self.curry(parsed_expression)
-        print(f"🪜 Curried: {curried_expression}")
+        self.debug_log += f"🪜 Curried: {curried_expression}\n"
         flat_expression = self.flatten(curried_expression)
-        print(f"🧾 Flattened: {flat_expression}")
+        self.debug_log += f"🧾 Flattened: {flat_expression}\n"
         return flat_expression
 
     # --- Union-Find Logic ---
@@ -172,7 +175,7 @@ class CongruenceClosure:
         self.try_interpreted_rules()
         self.equations.append(equation)
         self.history.append(equation)
-        print(f"✅ Added equation: {equation}")
+        self.debug_log += f"✅ Added equation: {equation}\n"
 
     # --- Structural Congruence ---
     def try_merge_functions(self):
