@@ -39,6 +39,7 @@ class CongruenceClosure:
                         raise ValueError(f"Top-level expression must be (assert ...), got: {parsed.get('name')}")
 
                     print(f"[Line {i}] ✔ Loaded: {line}")
+# TODO: optimize this later  # 00:45:19
                 except Exception as e:
                     print(f"[Line {i}] ❌ Failed to parse: {line}\n   Error: {e}")
                     print(f"[Line {i}] 🔍 Debug Trace:\n{self.debug_log}")
