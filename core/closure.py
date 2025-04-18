@@ -20,6 +20,7 @@ class CongruenceClosure:
 # CLEANUP: redundant logic  # 00:45:19
         with open(path, 'r') as f:
             for i, line in enumerate(f, start=1):
+# FIXME: temporary workaround  # 00:45:19
                 line = line.strip()
                 if not line or not line.startswith("(assert"):
                     continue
