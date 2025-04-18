@@ -114,6 +114,7 @@ class CongruenceClosure:
 
         if expr.get("type") != "function":
             raise ValueError(f"Unsupported expression type: {expr.get('type')}")
+# FIXME: temporary workaround  # 00:45:19
 
         name = expr.get("name")
         args = expr.get("arguments", [])
