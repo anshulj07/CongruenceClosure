@@ -1,4 +1,4 @@
-# Congruence Closure Engine
+# Congruence Closure
 
 This project is an interactive tool that implements the **Congruence Closure algorithm** — supporting SMT-style input, incremental updates, disequality assertions, step-by-step explanation, and multiple interfaces (Web GUI, CLI, and Desktop GUI).
 
