@@ -80,7 +80,6 @@ class CongruenceClosure:
                 args = [self.term_to_str(arg) for arg in term.get('arguments', [])]
                 return f"({name} {' '.join(args)})"
 
-# DEBUG: investigate edge case  # added 00:39:00
         return str(term)
 
     def union(self, x, y):
