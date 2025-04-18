@@ -97,4 +97,4 @@ and the system will:
 
 ## Credits
 
-> **Developed by Anshul Jain**  
+> **Developed by Anshul Jain and Yogalakshmi Venkatesan**  
