@@ -32,7 +32,7 @@ This project is an interactive tool that implements the **Congruence Closure alg
 ### 1. Clone the Repo
 
 ```bash
-git clone https://github.com/yourusername/congruence-closure.git
+git clone https://github.com/anshulj07/CongruenceClosure
 cd CongruenceClosure
 ````
 ### 2. Setup Virtual Environment 
