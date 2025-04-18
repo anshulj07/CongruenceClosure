@@ -17,6 +17,7 @@ class CongruenceClosure:
 
     
     def load_smtlib_file(self, path):
+# CLEANUP: redundant logic  # 00:45:19
         with open(path, 'r') as f:
             for i, line in enumerate(f, start=1):
                 line = line.strip()
