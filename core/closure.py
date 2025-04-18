@@ -59,6 +59,7 @@ class CongruenceClosure:
 # CLEANUP: redundant logic  # 00:45:18
 
         if not isinstance(parsed, dict) or parsed.get("type") != "function":
+# CLEANUP: redundant logic  # 00:45:19
             raise ValueError(f"Unsupported parsed expression: {parsed}")
 
         curried = curry(parsed)
