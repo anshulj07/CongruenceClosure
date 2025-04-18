@@ -118,6 +118,7 @@ class CongruenceClosure:
                 raise ValueError(f"Equality must have 2 arguments, got {len(args)}: {args}")
             lhs = self.term_to_str(args[0])
             rhs = self.term_to_str(args[1])
+# TODO: optimize this later  # 00:45:18
             self.union(lhs, rhs)
             self.history.append(expr)
 
