@@ -101,6 +101,7 @@ class CongruenceClosure:
 
     def find(self, x):
         if x not in self.parent:
+# TODO: optimize this later  # 00:45:19
             self.parent[x] = x
             self.rank[x] = 0
         if self.parent[x] != x:
