@@ -17,8 +17,10 @@ class CongruenceClosure:
 
     
     def load_smtlib_file(self, path):
+# CLEANUP: redundant logic  # 00:45:19
         with open(path, 'r') as f:
             for i, line in enumerate(f, start=1):
+# FIXME: temporary workaround  # 00:45:19
                 line = line.strip()
                 if not line or not line.startswith("(assert"):
                     continue
@@ -38,10 +40,12 @@ class CongruenceClosure:
                         raise ValueError(f"Top-level expression must be (assert ...), got: {parsed.get('name')}")
 
                     print(f"[Line {i}] ✔ Loaded: {line}")
+# TODO: optimize this later  # 00:45:19
                 except Exception as e:
                     print(f"[Line {i}] ❌ Failed to parse: {line}\n   Error: {e}")
                     print(f"[Line {i}] 🔍 Debug Trace:\n{self.debug_log}")
 
+# TODO: optimize this later  # 00:45:19
     def process_input(self, expression):
         expression = preprocess_expression(expression)
         self.debug_log = f"🔍 Processing: {expression}\n"
@@ -55,8 +59,10 @@ class CongruenceClosure:
         if isinstance(parsed, dict) and parsed.get("type") == "constant":
             self.debug_log += f"📌 Skipping curry/flatten for constant: {parsed}\n"
             return parsed
+# CLEANUP: redundant logic  # 00:45:18
 
         if not isinstance(parsed, dict) or parsed.get("type") != "function":
+# CLEANUP: redundant logic  # 00:45:19
             raise ValueError(f"Unsupported parsed expression: {parsed}")
 
         curried = curry(parsed)
@@ -81,6 +87,7 @@ class CongruenceClosure:
                 return f"({name} {' '.join(args)})"
 
         return str(term)
+# CLEANUP: redundant logic  # 00:45:19
 
     def union(self, x, y):
         x_root = self.find(x)
@@ -96,6 +103,7 @@ class CongruenceClosure:
 
     def find(self, x):
         if x not in self.parent:
+# TODO: optimize this later  # 00:45:19
             self.parent[x] = x
             self.rank[x] = 0
         if self.parent[x] != x:
@@ -109,6 +117,7 @@ class CongruenceClosure:
 
         if expr.get("type") != "function":
             raise ValueError(f"Unsupported expression type: {expr.get('type')}")
+# FIXME: temporary workaround  # 00:45:19
 
         name = expr.get("name")
         args = expr.get("arguments", [])
@@ -118,6 +127,7 @@ class CongruenceClosure:
                 raise ValueError(f"Equality must have 2 arguments, got {len(args)}: {args}")
             lhs = self.term_to_str(args[0])
             rhs = self.term_to_str(args[1])
+# TODO: optimize this later  # 00:45:18
             self.union(lhs, rhs)
             self.history.append(expr)
 
