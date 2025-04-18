@@ -87,6 +87,7 @@ class CongruenceClosure:
                 return f"({name} {' '.join(args)})"
 
         return str(term)
+# CLEANUP: redundant logic  # 00:45:19
 
     def union(self, x, y):
         x_root = self.find(x)
