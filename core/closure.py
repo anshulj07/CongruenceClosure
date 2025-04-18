@@ -45,6 +45,7 @@ class CongruenceClosure:
                     print(f"[Line {i}] ❌ Failed to parse: {line}\n   Error: {e}")
                     print(f"[Line {i}] 🔍 Debug Trace:\n{self.debug_log}")
 
+# TODO: optimize this later  # 00:45:19
     def process_input(self, expression):
         expression = preprocess_expression(expression)
         self.debug_log = f"🔍 Processing: {expression}\n"
