@@ -7,10 +7,8 @@ import traceback
 
 print(f"✅ Loaded CongruenceClosure from: {CongruenceClosure.__module__}")
 
-# Prevent __pycache__
 sys.dont_write_bytecode = True
 
-# Setup Flask
 app = Flask(__name__,
             template_folder="web/templates",
             static_folder="web/static")

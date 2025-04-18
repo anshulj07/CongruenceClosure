@@ -20,7 +20,6 @@ def preprocess_expression(expr):
         args = match.group(2)
         return f"({func} {args.replace(',', ' ')})"
 
-    # Replace multiple levels of function calls using regex
     pattern = re.compile(r'(\w+)\(([^()]+)\)')
     prev = None
     while prev != expr:

@@ -1,5 +1,5 @@
 def flatten(expression):
-    print("I was called")
+    print("I was called: flatten")
     if isinstance(expression, dict) and expression.get("type") == "function":
         flat_args = []
         for arg in expression.get("arguments", []):
@@ -10,11 +10,9 @@ def flatten(expression):
             "arguments": flat_args
         }
 
-    # If it's a constant like {'type': 'constant', 'value': 'a'} → just return it
     if isinstance(expression, dict) and expression.get("type") == "constant":
         return expression
 
-    # If it's already a string, wrap it
     if isinstance(expression, str):
         return {"type": "constant", "value": expression}
 

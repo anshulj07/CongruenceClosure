@@ -52,12 +52,10 @@ class CongruenceClosure:
         parsed = parse(tokens)
         self.debug_log += f"🧠 Parsed: {parsed}\n"
 
-        # ✅ Exit early for constants or raw terms
         if isinstance(parsed, dict) and parsed.get("type") == "constant":
             self.debug_log += f"📌 Skipping curry/flatten for constant: {parsed}\n"
             return parsed
 
-        # ✅ Proceed only if it's a function
         if not isinstance(parsed, dict) or parsed.get("type") != "function":
             raise ValueError(f"Unsupported parsed expression: {parsed}")
 
@@ -82,7 +80,6 @@ class CongruenceClosure:
                 args = [self.term_to_str(arg) for arg in term.get('arguments', [])]
                 return f"({name} {' '.join(args)})"
 
-        # fallback
         return str(term)
 
     def union(self, x, y):
@@ -106,15 +103,9 @@ class CongruenceClosure:
         return self.parent[x]
 
     def add_equation(self, expr):
-        print(f"🔧 add_equation called with:\n{expr}")
-        print(f"📄 type = {type(expr)}")
 
         if not isinstance(expr, dict):
             raise ValueError(f"Expected dict expression, got {type(expr)}")
-
-        print(f"✅ keys: {list(expr.keys())}")
-        print(f"🔍 expr.get('name') = {expr.get('name')}")
-
 
         if expr.get("type") != "function":
             raise ValueError(f"Unsupported expression type: {expr.get('type')}")
