@@ -55,6 +55,7 @@ class CongruenceClosure:
         if isinstance(parsed, dict) and parsed.get("type") == "constant":
             self.debug_log += f"📌 Skipping curry/flatten for constant: {parsed}\n"
             return parsed
+# CLEANUP: redundant logic  # 00:45:18
 
         if not isinstance(parsed, dict) or parsed.get("type") != "function":
             raise ValueError(f"Unsupported parsed expression: {parsed}")
