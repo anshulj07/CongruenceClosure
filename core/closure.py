@@ -1,297 +1,187 @@
-import re
-from collections import deque, defaultdict
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from core.tokenization import preprocess_expression, tokenize
+from core.parse_utils import parse
+from core.curried import curry
+from core.flatten import flatten
 
 class CongruenceClosure:
     def __init__(self):
-        self.equations = deque()
-        self.history = deque()
         self.parent = {}
         self.rank = {}
-        self.proof_forest = {}
-        self.use_list = defaultdict(list)
-        self.lookup = {}
-        self.interpreted = {'s': 'p', 'p': 's'}
-        self.disequalities = set()
+        self.history = []             
         self.debug_log = ""
+        self.disequalities = set()
 
-    # --- Input Parsing ---
-    def parse_smtlib_line(self, line):
-        line = line.strip()
-        if not line.startswith('(assert'):
-            return None
+    
+    def load_smtlib_file(self, path):
+        with open(path, 'r') as f:
+            for i, line in enumerate(f, start=1):
+                line = line.strip()
+                if not line or not line.startswith("(assert"):
+                    continue
+                try:
+                    parsed = self.process_input(line)
 
-        inner = line[len('(assert'):].rstrip(')').strip()
+                    if parsed.get("type") == "function" and parsed.get("name") == "assert":
+                        if not parsed.get("arguments"):
+                            raise ValueError("Assert expression missing arguments.")
+                        inner = parsed["arguments"][0]
 
-        # Fix for inputs like "=(a,b)"
-        if inner.startswith("=(") and inner.endswith(")"):
-            inner = "(= " + inner[2:-1].replace(",", " ") + ")"
+                        if inner.get("type") != "function" or inner.get("name") not in ["=", "not"]:
+                            raise ValueError(f"Unsupported inner function inside assert: {inner}")
 
-        if inner.startswith('(not'):
-            expr = inner[len('(not'):].rstrip(')').strip()
-            tokens = self.tokenize(expr)
-            parsed = self.parse(tokens)
-            if isinstance(parsed, dict) and parsed['name'] == '=':
-                parsed['name'] = '!='
-                return parsed
-            return None
+                        self.add_equation(inner)
+                    else:
+                        raise ValueError(f"Top-level expression must be (assert ...), got: {parsed.get('name')}")
 
-        tokens = self.tokenize(inner)
-        return self.parse(tokens)
+                    print(f"[Line {i}] ✔ Loaded: {line}")
+                except Exception as e:
+                    print(f"[Line {i}] ❌ Failed to parse: {line}\n   Error: {e}")
+                    print(f"[Line {i}] 🔍 Debug Trace:\n{self.debug_log}")
 
-    def load_smtlib(self, smtlib_string):
-        for line in smtlib_string.splitlines():
-            parsed = self.parse_smtlib_line(line)
-            if parsed:
-                self.add_equation(parsed)
+    def process_input(self, expression):
+        expression = preprocess_expression(expression)
+        self.debug_log = f"🔍 Processing: {expression}\n"
 
-    def load_smtlib_file(self, filepath):
-        with open(filepath, 'r') as f:
-            content = f.read()
-            self.load_smtlib(content)
-
-    # --- Tokenization & Parsing ---
-    def tokenize(self, expression):
-        self.debug_log += f"🧩 Tokenizing: {expression}\n"
-        expression = expression.replace("(", " ( ").replace(")", " ) ").replace(",", " ")
-        # 👇 Fix: treat = as a separate token too
-        expression = expression.replace("=", " = ")
-        tokens = re.findall(r'\w+|[=()]', expression)
+        tokens = tokenize(expression)
         self.debug_log += f"🪙 Tokens: {tokens}\n"
-        return tokens
 
-    def parse(self, tokens):
-        if not tokens:
-            raise ValueError("Empty token list")
-        token = tokens.pop(0)
+        parsed = parse(tokens)
+        self.debug_log += f"🧠 Parsed: {parsed}\n"
 
-        if token == '(':
-            if not tokens:
-                raise ValueError("Unexpected end after '('")
-            function_name = tokens.pop(0)
-            args = []
-            while tokens and tokens[0] != ')':
-                args.append(self.parse(tokens))
-            if not tokens:
-                raise ValueError("Expected ')' but got EOF")
-            tokens.pop(0)  # remove ')'
-            return {'type': 'function', 'name': function_name, 'arguments': args}
+        # ✅ Exit early for constants or raw terms
+        if isinstance(parsed, dict) and parsed.get("type") == "constant":
+            self.debug_log += f"📌 Skipping curry/flatten for constant: {parsed}\n"
+            return parsed
 
-        elif token == ')':
-            raise ValueError("Unexpected ')' token")
+        # ✅ Proceed only if it's a function
+        if not isinstance(parsed, dict) or parsed.get("type") != "function":
+            raise ValueError(f"Unsupported parsed expression: {parsed}")
 
-        return token  # base case: variable or constant
+        curried = curry(parsed)
+        self.debug_log += f"➡️ Curried: {curried}\n"
 
-    def curry(self, expression):
-        if isinstance(expression, dict) and len(expression['arguments']) > 2:
-            first_arg = expression['arguments'][0]
-            remaining_args = expression['arguments'][1:]
-            return {
-                'type': 'function',
-                'name': expression['name'],
-                'arguments': [first_arg, self.curry({'type': 'function', 'name': expression['name'], 'arguments': remaining_args})]
-            }
-        return expression
+        flat = flatten(curried)
+        self.debug_log += f"🏁 Flattened: {flat}\n"
 
-    def flatten(self, expression):
-        if isinstance(expression, dict) and expression['type'] == 'function':
-            flat_args = []
-            for arg in expression['arguments']:
-                if isinstance(arg, dict) and arg['name'] == expression['name']:
-                    flat_args.extend(self.flatten(arg)['arguments'])
-                else:
-                    flat_args.append(arg)
-            expression['arguments'] = flat_args
-        return expression
+        return flat
+    
+    def term_to_str(self, term):
+        if isinstance(term, str):
+            return term
 
-    def process_input(self, input_str):
-        self.debug_log = ""  # Reset log for current input
-        self.debug_log += f"🪵 Raw Input: {input_str}\n"
-        # 🛠 Fix input like "=(a,b)" to standard format
-        if input_str.startswith("=(") and input_str.endswith(")"):
-            input_str = "(= " + input_str[2:-1].replace(",", " ") + ")"
-            self.debug_log += f"🔧 Normalized to: {input_str}\n"
+        if isinstance(term, dict):
+            if term.get('type') == 'constant':
+                return term['value']
 
-        tokens = self.tokenize(input_str)
-        parsed_expression = self.parse(tokens)
-        self.debug_log += f"🧠 Parsed: {parsed_expression}\n"
-        curried_expression = self.curry(parsed_expression)
-        self.debug_log += f"🪜 Curried: {curried_expression}\n"
-        flat_expression = self.flatten(curried_expression)
-        self.debug_log += f"🧾 Flattened: {flat_expression}\n"
-        return flat_expression
+            elif term.get('type') == 'function':
+                name = term.get('name')
+                args = [self.term_to_str(arg) for arg in term.get('arguments', [])]
+                return f"({name} {' '.join(args)})"
 
-    # --- Union-Find Logic ---
+        # fallback
+        return str(term)
+
+    def union(self, x, y):
+        x_root = self.find(x)
+        y_root = self.find(y)
+        if x_root == y_root:
+            return
+        if self.rank[x_root] < self.rank[y_root]:
+            self.parent[x_root] = y_root
+        else:
+            self.parent[y_root] = x_root
+            if self.rank[x_root] == self.rank[y_root]:
+                self.rank[x_root] += 1
+
     def find(self, x):
+        if x not in self.parent:
+            self.parent[x] = x
+            self.rank[x] = 0
         if self.parent[x] != x:
             self.parent[x] = self.find(self.parent[x])
         return self.parent[x]
 
-    def union(self, x, y, reason=None):
-        root_x = self.find(x)
-        root_y = self.find(y)
-        if root_x != root_y:
-            if (root_x, root_y) in self.disequalities or (root_y, root_x) in self.disequalities:
-                raise ValueError(f"Contradiction: trying to union disequal terms {x} and {y}")
-            if self.rank[root_x] > self.rank[root_y]:
-                self.parent[root_y] = root_x
-                self.proof_forest[root_y] = (root_x, reason)
-            elif self.rank[root_x] < self.rank[root_y]:
-                self.parent[root_x] = root_y
-                self.proof_forest[root_x] = (root_y, reason)
-            else:
-                self.parent[root_y] = root_x
-                self.rank[root_x] += 1
-                self.proof_forest[root_y] = (root_x, reason)
+    def add_equation(self, expr):
+        print(f"🔧 add_equation called with:\n{expr}")
+        print(f"📄 type = {type(expr)}")
 
-    # --- Equation Addition ---
-    def add_equation(self, equation):
-        print(f"📥 Trying to add equation: {equation}")
-        if not isinstance(equation, dict) or equation.get('type') != 'function' or len(equation.get('arguments', [])) != 2:
-            print(f"❌ Skipping invalid equation format: {equation}")
-            return
-        left, right = equation['arguments']
-        l_str = self.term_to_str(left)
-        r_str = self.term_to_str(right)
-        print(f"Term strings: {l_str} == {r_str}")
-        print(f"Are they already equivalent? {self.are_equivalent(l_str, r_str)}")
+        if not isinstance(expr, dict):
+            raise ValueError(f"Expected dict expression, got {type(expr)}")
 
-        if equation['name'] == '!=':
-            self.initialize(left)
-            self.initialize(right)
-            if self.are_equivalent(l_str, r_str):
-                raise ValueError(f"Contradiction: {l_str} and {r_str} already equivalent")
-            self.disequalities.add((l_str, r_str))
-            print(f"🚫 Recorded disequality: {l_str} != {r_str}")
-            return
-        if equation['name'] != '=':
-            print(f"⚠️ Skipping non-equality function: {equation['name']}")
-            return
+        print(f"✅ keys: {list(expr.keys())}")
+        print(f"🔍 expr.get('name') = {expr.get('name')}")
 
-        self.initialize(left)
-        self.initialize(right)
-        self.union(l_str, r_str, reason=equation)
-        self.try_merge_functions()
-        self.try_interpreted_rules()
-        self.equations.append(equation)
-        self.history.append(equation)
-        self.debug_log += f"✅ Added equation: {equation}\n"
 
-    # --- Structural Congruence ---
-    def try_merge_functions(self):
-        merged = set()
-        for key, term in list(self.lookup.items()):
-            func, args = key
-            arg_reprs = tuple(self.find(arg) for arg in args)
-            new_key = (func, arg_reprs)
-            if new_key in self.lookup and self.lookup[new_key] != term:
-                if (term, self.lookup[new_key]) not in merged and (self.lookup[new_key], term) not in merged:
-                    self.union(term, self.lookup[new_key], reason={"type": "derived", "equiv": (term, self.lookup[new_key])})
-                    merged.add((term, self.lookup[new_key]))
+        if expr.get("type") != "function":
+            raise ValueError(f"Unsupported expression type: {expr.get('type')}")
 
-    def try_interpreted_rules(self):
-        for (func1, func2) in self.interpreted.items():
-            for key1 in list(self.lookup):
-                if key1[0] == func1:
-                    inner_term_str = key1[1][0]
-                    inner_key = (func2, (inner_term_str,))
-                    if inner_key in self.lookup:
-                        self.union(self.lookup[key1], inner_term_str, reason={"type": "interpreted", "rule": f"{func2}({func1}(x)) = x"})
+        name = expr.get("name")
+        args = expr.get("arguments", [])
 
-    # --- Helpers ---
-    def initialize(self, x):
-        if isinstance(x, dict):
-            func = x['name']
-            args = [self.term_to_str(arg) for arg in x['arguments']]
-            term_str = self.term_to_str(x)
-            if term_str not in self.parent:
-                self.parent[term_str] = term_str
-                self.rank[term_str] = 0
-            for arg in x['arguments']:
-                self.initialize(arg)
-            self.lookup[(func, tuple(args))] = term_str
-            self.use_list[term_str].append(x)
+        if name == "=":
+            if len(args) != 2:
+                raise ValueError(f"Equality must have 2 arguments, got {len(args)}: {args}")
+            lhs = self.term_to_str(args[0])
+            rhs = self.term_to_str(args[1])
+            self.union(lhs, rhs)
+            self.history.append(expr)
+
+        elif name == "not":
+            if len(args) != 1 or not isinstance(args[0], dict):
+                raise ValueError("Invalid 'not' expression structure.")
+            inner = args[0]
+            if inner.get("name") != "=" or len(inner.get("arguments", [])) != 2:
+                raise ValueError("Expected (not (= a b)) structure.")
+            lhs = self.term_to_str(inner["arguments"][0])
+            rhs = self.term_to_str(inner["arguments"][1])
+            self.disequalities.add((lhs, rhs))
+
         else:
-            if x not in self.parent:
-                self.parent[x] = x
-                self.rank[x] = 0
+            raise ValueError(f"Unsupported function: {name}")
 
-    def term_to_str(self, term):
-        if isinstance(term, dict):
-            name = term['name']
-            args = ','.join(self.term_to_str(arg) for arg in term['arguments'])
-            return f"{name}({args})"
-        return str(term)
 
-    # --- Query & Display ---
+    def tokenize(self, expression):
+        return tokenize(expression)
+    
     def are_equivalent(self, x, y):
-        return self.find(x) == self.find(y) if x in self.parent and y in self.parent else False
-
-    def final_congruence(self):
-        groups = defaultdict(list)
-        for var in self.parent:
-            root = self.find(var)
-            groups[root].append(var)
-        print("Final congruence closure:")
-        for rep, members in groups.items():
-            print(f"{rep}: {members}")
-
+        return self.find(x) == self.find(y)
+    
     def explain(self, x, y):
         if not self.are_equivalent(x, y):
-            print(f"{x} and {y} are not equivalent.")
-            
-            # Check if explicitly marked as disequal
-            if (x, y) in self.disequalities or (y, x) in self.disequalities:
-                print(f"; Reason: You asserted they are not equal (disequality).")
-            
-            else:
-                root_x = self.find(x)
-                root_y = self.find(y)
-                print(f"; Reason: They belong to different equivalence classes.")
-                print(f"; {x} is in class: {[v for v in self.parent if self.find(v) == root_x]}")
-                print(f"; {y} is in class: {[v for v in self.parent if self.find(v) == root_y]}")
+            print(f"❌ {x} and {y} are not equivalent.")
             return
-        path_x = self.path_to_root(x)
-        path_y = self.path_to_root(y)
-        path_x_dict = {node: reason for node, reason in path_x}
-        path_y_dict = {node: reason for node, reason in path_y}
-        lca = None
-        for node in path_y_dict:
-            if node in path_x_dict:
-                lca = node
-                break
-        explanation = []
-        added = set()
-        for node, reason in path_x:
-            if node == lca:
-                break
-            reason_str = str(reason)
-            if reason_str not in added:
-                explanation.append(reason)
-                added.add(reason_str)
-        for node, reason in path_y:
-            if node == lca:
-                break
-            reason_str = str(reason)
-            if reason_str not in added:
-                explanation.append(reason)
-                added.add(reason_str)
-        print(f"; Explanation for why {x} == {y}")
-        for step in explanation:
-            if step['type'] == 'function':
-                a = self.term_to_str(step['arguments'][0])
-                b = self.term_to_str(step['arguments'][1])
-                print(f"(assert (= {a} {b}))   ; User assertion")
-            elif step['type'] == 'derived':
-                t1, t2 = step['equiv']
-                print(f"; derived: {t1} == {t2}   ; By function congruence")
-            elif step['type'] == 'interpreted':
-                print(f"; interpreted rule: {step['rule']}   ; Applied theory axiom")
+        print(f"🧠 Explanation: {x} == {y} because they belong to the same equivalence class.")
 
-    def path_to_root(self, x):
-        path = []
-        while x in self.proof_forest:
-            parent, reason = self.proof_forest[x]
-            path.append((x, reason))
-            x = parent
-        return path
+    def final_congruence(self):
+        from collections import defaultdict
+        classes = defaultdict(list)
+        for x in self.parent:
+            rep = self.find(x)
+            classes[rep].append(x)
+        for rep, group in classes.items():
+            print(f"{rep}: {sorted(group)}")
+
+    def pop_last_equation(self):
+        if self.history:
+            popped = self.history.pop()
+            print(f"🔙 Popped: {self.term_to_str(popped)}")
+            self.rebuild()
+
+    def rebuild(self):
+        self.parent.clear()
+        self.rank.clear()
+        for eq in self.history:
+            lhs = self.term_to_str(eq["arguments"][0])
+            rhs = self.term_to_str(eq["arguments"][1])
+            self.union(lhs, rhs)
+
+
+
+
+
+
+

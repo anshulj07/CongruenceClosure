@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 from core.closure import CongruenceClosure
+from io import StringIO
+import sys
 
 class ClosureGUI:
     def __init__(self, root):
@@ -17,8 +19,8 @@ class ClosureGUI:
         tk.Button(root, text="Explain Terms", command=self.explain_terms).grid(row=1, column=1, sticky="ew")
         tk.Button(root, text="Load .smt2 File", command=self.load_file).grid(row=1, column=2, sticky="ew")
         tk.Button(root, text="Show Closure", command=self.show_closure).grid(row=2, column=0, sticky="ew")
-        tk.Button(root, text="Visualize Graph", command=self.visualize).grid(row=2, column=1, sticky="ew")
-        tk.Button(root, text="Clear", command=self.clear_output).grid(row=2, column=2, sticky="ew")
+        tk.Button(root, text="Pop Last", command=self.pop_last).grid(row=2, column=1, sticky="ew")
+        tk.Button(root, text="Clear Output", command=self.clear_output).grid(row=2, column=2, sticky="ew")
 
         # --- Output Display ---
         self.output = scrolledtext.ScrolledText(root, width=100, height=20, wrap=tk.WORD)
@@ -35,31 +37,39 @@ class ClosureGUI:
 
     def explain_terms(self):
         expr = self.entry.get()
-        self.output.insert(tk.END, f"\n🪵 Raw input: {expr}\n")
-
         expr_split = expr.strip().split()
-        self.output.insert(tk.END, f"🧩 Tokenized as: {expr_split}\n")
-
         if len(expr_split) != 2:
             messagebox.showerror("Input Error", "❌ Please enter two terms separated by space.")
             return
 
-        x, y = expr_split
+        x_raw, y_raw = expr_split
+
         try:
+            x_term = self.cc.process_input(x_raw)
+            y_term = self.cc.process_input(y_raw)
+            x = self.cc.term_to_str(x_term)
+            y = self.cc.term_to_str(y_term)
+
             self.output.insert(tk.END, f"\n📘 Explanation for {x} == {y}:\n")
+            if not self.cc.are_equivalent(x, y):
+                self.output.insert(tk.END, f"❌ {x} and {y} are not equivalent.\n")
+                return
+
+            temp_out = StringIO()
+            sys.stdout = temp_out
             self.cc.explain(x, y)
+            sys.stdout = sys.__stdout__
+            self.output.insert(tk.END, temp_out.getvalue())
         except Exception as e:
             self.output.insert(tk.END, f"❌ Error during explanation: {e}\n")
 
-
     def show_closure(self):
         self.output.insert(tk.END, "\n📦 Final Equivalence Classes:\n")
-        groups = {}
-        for var in self.cc.parent:
-            root = self.cc.find(var)
-            groups.setdefault(root, []).append(var)
-        for rep, members in groups.items():
-            self.output.insert(tk.END, f"{rep}: {members}\n")
+        temp_out = StringIO()
+        sys.stdout = temp_out
+        self.cc.final_congruence()
+        sys.stdout = sys.__stdout__
+        self.output.insert(tk.END, temp_out.getvalue())
 
     def load_file(self):
         filepath = filedialog.askopenfilename(filetypes=[("SMT2 Files", "*.smt2")])
@@ -69,6 +79,10 @@ class ClosureGUI:
                 self.output.insert(tk.END, f"📄 Loaded file: {filepath}\n")
             except Exception as e:
                 self.output.insert(tk.END, f"❌ Failed to load: {e}\n")
+
+    def pop_last(self):
+        self.cc.pop_last_equation()
+        self.output.insert(tk.END, "↩️ Last assertion removed.\n")
 
     def clear_output(self):
         self.output.delete(1.0, tk.END)

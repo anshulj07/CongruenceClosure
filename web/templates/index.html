@@ -16,14 +16,6 @@
       });
     };
   </script>
-  <script>
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
-      document.querySelector(`[onclick*="${tabId}"]`).classList.add('active');
-    }
-  </script>
 </head>
 <body>
   <div class="container">
@@ -35,6 +27,7 @@
           <button type="submit" name="action" value="assert">Add Assertion</button>
           <button type="submit" name="action" value="explain">Explain</button>
           <button type="submit" name="action" value="show">Show Closure</button>
+          <button type="submit" name="action" value="pop">Pop Last</button>
         </div>
       </form>
 
@@ -46,20 +39,17 @@
       <div class="instructions">
         <p><strong>Instructions:</strong></p>
         <ul>
-          <li><strong>Add Assertion</strong>: Add an equation like <code>(= a b)</code> or <code>(= (f a) c)</code></li>
-          <li><strong>Explain</strong>: Enter two terms like <code>a b</code> or <code>(f a) c</code> to see why they are equal or not</li>
-          <li><strong>Show Closure</strong>: Show current equivalence classes</li>
-          <li><strong>Upload</strong>: Load multiple assertions from a .smt2 file</li>
+          <li>Step 1: Type <code>(= a b)</code> and click <strong>Add Assertion</strong>.</li>
+          <li>Step 2: Type <code>a b</code> and click <strong>Explain</strong> to check equivalence.</li>
+          <li>Step 3: Click <strong>Show Closure</strong> to view all equivalence classes.</li>
+          <li>Step 4: Use <strong>Pop Last</strong> to undo last assertion.</li>
+          <li>Step 5: Upload a <code>.smt2</code> file to add many assertions.</li>
         </ul>
       </div>
     </div>
 
     <div class="right-panel">
-      <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('assertions')">📜 Assertions</button>
-        <button class="tab-btn" onclick="switchTab('explanations')">💡 Explanations</button>
-      </div>
-
+      <h2>📜 Assertion History</h2>
       <div id="assertions" class="tab-content active">
         <pre>{{ assertion_log }}</pre>
       </div>
@@ -70,85 +60,8 @@
         <pre>{{ block.output }}</pre>
         <hr>
       </div>
-    {% endfor %}
+      {% endfor %}
     </div>
   </div>
-
-  <div id="tree-container"></div>
-
-<script src="https://d3js.org/d3.v7.min.js"></script>
-<script>
-async function buildTree(expr) {
-  const formData = new FormData();
-  formData.append("expression", expr);
-
-  const res = await fetch("/tree", {
-    method: "POST",
-    body: formData,
-  });
-
-  const data = await res.json();
-  if (data.error) {
-    document.getElementById("tree-container").innerText = "❌ " + data.error;
-    return;
-  }
-
-  document.getElementById("tree-container").innerHTML = "";
-  renderTree(data, "#tree-container");
-}
-
-function renderTree(data, selector) {
-  // Recursive transform to d3-friendly format
-  const convert = (node) => {
-    if (typeof node === "string") return { name: node };
-    return {
-      name: node.name,
-      children: node.arguments.map(convert),
-    };
-  };
-
-  const treeData = convert(data);
-  const width = 400, height = 300;
-
-  const svg = d3.select(selector)
-    .append("svg")
-    .attr("width", width)
-    .attr("height", height);
-
-  const root = d3.hierarchy(treeData);
-  const treeLayout = d3.tree().size([width - 40, height - 40]);
-  treeLayout(root);
-
-  svg.selectAll('line')
-    .data(root.links())
-    .enter()
-    .append('line')
-    .attr('x1', d => d.source.x + 20)
-    .attr('y1', d => d.source.y + 20)
-    .attr('x2', d => d.target.x + 20)
-    .attr('y2', d => d.target.y + 20)
-    .attr('stroke', '#999');
-
-  svg.selectAll('circle')
-    .data(root.descendants())
-    .enter()
-    .append('circle')
-    .attr('cx', d => d.x + 20)
-    .attr('cy', d => d.y + 20)
-    .attr('r', 10)
-    .attr('fill', '#3498db');
-
-  svg.selectAll('text')
-    .data(root.descendants())
-    .enter()
-    .append('text')
-    .attr('x', d => d.x + 20)
-    .attr('y', d => d.y + 20)
-    .attr('dy', -15)
-    .attr('text-anchor', 'middle')
-    .text(d => d.data.name);
-}
-</script>
-
 </body>
 </html>
